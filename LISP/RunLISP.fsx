@@ -54,10 +54,11 @@ let updateGlobal x v =
 // exception for LISP evaluation errors
 
 exception Lerror of string
+exception LISPError of Sexp
 
 // specials do not evaluate (all) their arguments
 let specials =
-  ["quote"; "lambda"; "\\"; "if"; "define"; "save"; "load"; "let"]
+  ["quote"; "lambda"; "\\"; "if"; "define"; "save"; "load"; "let"; "try"; "with"; "raise"]
 
 // unary operators
 let unops = ["number?"; "symbol?"]
@@ -76,228 +77,207 @@ let predefined = specials @ operators
 // if error raise exception Lerror message
 
 let rec eval s localEnv =
-  try
-    match s with
-    | Nil -> Nil
-    | Num _ -> s // numbers evaluate to themselves
-    | Symbol x -> // predefined or variable
-        if List.contains x operators
-        then s  // operators evaluate to themselves
-        else
-          match lookup (localEnv @ globalEnv) x with
-          | Some v -> v
-          | None -> raise (Lerror ("Undefined variable " + x))
-    | Cons (Symbol "quote", Cons (v, Nil)) -> v
-          // quote returns its argument unevaluated
-    | Cons (Symbol "\\", rules) -> Closure (s, localEnv)
-          // a statically scoped function builds a closure
-          // of the function and the local environment at its definition
-    | Cons (Symbol "lambda", rules) -> s
-          // multi-way conditional
-    | Cons (Symbol "if", es) ->
-        match es with
-        | Nil -> Nil
-        | Cons (e1, Nil) -> eval e1 localEnv
-        | Cons (e1, Cons (e2, ess)) ->
-            if eval e1 localEnv <> Nil
-            then eval e2 localEnv
-            else eval (Cons (Symbol "if", ess)) localEnv
-        | _ -> raise (Lerror ("Malformed if-expression " + Sexp.showSexp s))
-          // a dynamically scoped function just evaluates to itself.
-    | Closure _ -> s // closures evaluate to themselves
-    | Cons (Symbol "define", Cons (Symbol x, Cons (e, Nil))) ->
-          // binds name in the global environment unless it is a predefined name
-        if List.contains x predefined then
-          raise (Lerror (x + " can not be redefined"))
-        else
-          (updateGlobal x (eval e localEnv); Symbol x)
-    | Cons (Symbol "fun", Cons (Symbol x, rules)) ->
-          // defines global function unless it is a predefined name
-        if List.contains x predefined then
-          raise (Lerror (x + " can not be redefined"))
-        else
-          (updateGlobal x (Closure (Cons (Symbol "\\", rules), localEnv));
-          Symbol x)
-    | Cons (Symbol "::", Cons (e1, Cons (e2, Nil))) -> // builds a pair
-        Cons (eval e1 localEnv, eval e2 localEnv)
-    | Cons (Symbol "save", Cons (Symbol f, Nil)) ->
-          // saves global envirenment to file
-        try
-          let envText = // create definitions as text, one per line
-                String.concat "\n"
-                  (List.map
-                    (fun (x,v) ->
-                      showSexp 
-                        (makeList [Symbol "define"; Symbol x; quoteExp v]))
-                    globalEnv)
-          let outfile = System.IO.File.CreateText (f + ".le")
-          outfile.Write envText; outfile.Close (); Nil
-        with _ -> raise (Lerror ("Could not open file " + f + ".le"))
-    | Cons (Symbol "load", Cons (Symbol f, Nil)) ->
-          // loads global envirenment from file
-        let infile = try new System.IO.StreamReader (f + ".le")
-                      with _ -> raise (Lerror ("Could not open file " + f + ".le"))
-        try repl infile ()
-        with EndOfFile s ->
-          (if skipWhite s 0 s.Length <> s.Length then
-            printf "! %s\n" "File ended before expression was complete"
-          ; infile.Close ())
-        ; Nil
-    | Cons (Symbol "let", Cons (e1, Nil)) -> eval e1 localEnv 
-    | Cons (Symbol "let", Cons (p, Cons (e1, rest))) -> 
-        let v = eval e1 localEnv 
-        (match matchPattern p v with
-        | None -> raise (Lerror ("The pattern "
-                                  + showSexpIndent p 12 12
-                                  + " did not match the value "
-                                  + showSexpIndent v 30 30))
-        | Some env -> eval (Cons (Symbol "let", rest)) (env @ localEnv))
-    | Cons (e1, args) -> // function application
-        applyFun (eval e1 localEnv, evalList args localEnv, localEnv)
-  with
-    | :? System.ArgumentException -> eprintfn "Invalid argument during eval"; Num 1
-    | ex -> eprintfn "Error occured during eval: %s" ex.Message; Num 2
+  match s with
+  | Nil -> Nil
+  | Num _ -> s // numbers evaluate to themselves
+  | Symbol x -> // predefined or variable
+      if List.contains x operators
+      then s  // operators evaluate to themselves
+      else
+        match lookup (localEnv @ globalEnv) x with
+        | Some v -> v
+        | None -> raise (Lerror ("Undefined variable " + x))
+  | Cons (Symbol "quote", Cons (v, Nil)) -> v
+        // quote returns its argument unevaluated
+  | Cons (Symbol "\\", rules) -> Closure (s, localEnv)
+        // a statically scoped function builds a closure
+        // of the function and the local environment at its definition
+  | Cons (Symbol "lambda", rules) -> s
+        // multi-way conditional
+  | Cons (Symbol "if", es) ->
+      match es with
+      | Nil -> Nil
+      | Cons (e1, Nil) -> eval e1 localEnv
+      | Cons (e1, Cons (e2, ess)) ->
+          if eval e1 localEnv <> Nil
+          then eval e2 localEnv
+          else eval (Cons (Symbol "if", ess)) localEnv
+      | _ -> raise (Lerror ("Malformed if-expression " + Sexp.showSexp s))
+        // a dynamically scoped function just evaluates to itself.
+  | Closure _ -> s // closures evaluate to themselves
+  | Cons (Symbol "define", Cons (Symbol x, Cons (e, Nil))) ->
+        // binds name in the global environment unless it is a predefined name
+      if List.contains x predefined then
+        raise (Lerror (x + " can not be redefined"))
+      else
+        (updateGlobal x (eval e localEnv); Symbol x)
+  | Cons (Symbol "fun", Cons (Symbol x, rules)) ->
+        // defines global function unless it is a predefined name
+      if List.contains x predefined then
+        raise (Lerror (x + " can not be redefined"))
+      else
+        (updateGlobal x (Closure (Cons (Symbol "\\", rules), localEnv));
+        Symbol x)
+  | Cons (Symbol "::", Cons (e1, Cons (e2, Nil))) -> // builds a pair
+      Cons (eval e1 localEnv, eval e2 localEnv)
+  | Cons (Symbol "save", Cons (Symbol f, Nil)) ->
+        // saves global envirenment to file
+      try
+        let envText = // create definitions as text, one per line
+              String.concat "\n"
+                (List.map
+                  (fun (x,v) ->
+                    showSexp 
+                      (makeList [Symbol "define"; Symbol x; quoteExp v]))
+                  globalEnv)
+        let outfile = System.IO.File.CreateText (f + ".le")
+        outfile.Write envText; outfile.Close (); Nil
+      with _ -> raise (Lerror ("Could not open file " + f + ".le"))
+  | Cons (Symbol "load", Cons (Symbol f, Nil)) ->
+        // loads global envirenment from file
+      let infile = try new System.IO.StreamReader (f + ".le")
+                    with _ -> raise (Lerror ("Could not open file " + f + ".le"))
+      try repl infile ()
+      with EndOfFile s ->
+        (if skipWhite s 0 s.Length <> s.Length then
+          printf "! %s\n" "File ended before expression was complete"
+        ; infile.Close ())
+      ; Nil
+  | Cons (Symbol "let", Cons (e1, Nil)) -> eval e1 localEnv 
+  | Cons (Symbol "let", Cons (p, Cons (e1, rest))) -> 
+      let v = eval e1 localEnv 
+      (match matchPattern p v with
+      | None -> raise (Lerror ("The pattern "
+                                + showSexpIndent p 12 12
+                                + " did not match the value "
+                                + showSexpIndent v 30 30))
+      | Some env -> eval (Cons (Symbol "let", rest)) (env @ localEnv))
+  | Cons (Symbol "raise", exp) ->
+      let v = eval exp localEnv 
+      raise (LISPError v)  
+  | Cons (Symbol "try", Cons (es, Cons (Symbol "with", exp))) ->
+      try
+        eval es localEnv
+      with LISPError v -> printfn "LISPERROR"; applyFun (eval exp localEnv, v, localEnv)
+  | Cons (e1, args) -> // function application
+      applyFun (eval e1 localEnv, evalList args localEnv, localEnv)
 // apply function to arguments
 
 and applyFun (fnc, pars, localEnv) =
-  try
-    match fnc with
-    | Symbol x when (List.contains x unops) ->
-        // apply unary operator to one argument
-        match pars with
-        | Cons (v, Nil) -> applyUnop x v
-        | _ -> raise (Lerror ("Wrong number of arguments to " + x))
-    | Symbol x when (List.contains x binops) ->
-        // apply binary operator to two arguments
-        match pars with
-        | Cons (v1, Cons (v2, Nil)) ->
-              applyBinop x (v1, v2, localEnv)
-        | _ -> raise (Lerror ("Wrong number of arguments to " + x))
-    | Symbol x when (List.contains x varops) ->
-        // apply variable-arity operator to all arguments
-        applyVarop x pars
-    | Closure (Cons (Symbol "\\", rules), closureEnv) ->
-      // apply a closure to all arguments,
-      // using the environment from closure
-        try
-          tryRules rules pars closureEnv
-        with Lerror message ->
-          raise (Lerror (message + "\n! when applying "
-                          + showSexpIndent (Cons (Symbol "\\", rules))
-                                          16 16
-                          + "\n! to " + showSexpIndent pars 5 5))
-    | Cons (Symbol "lambda", rules) ->
-      // apply a dynamically scoped function to all arguments,
-      // using the current environment
-        try
-          tryRules rules pars localEnv
-        with Lerror message ->
-          raise (Lerror (message + "\n! when applying "
-                          + showSexpIndent fnc 16 16 + "\n! to "
-                          + showSexpIndent pars 5 5))
-      // not a function or operator -- report error
-    | _ -> raise (Lerror (showSexp fnc + " can not be applied as a function"))
-  with
-    | :? System.ArgumentException -> eprintfn "Invalid argument during applyFun"; Num 1
-    | ex -> eprintfn "Error occured during applyFun: %s" ex.Message; Num 2
+  match fnc with
+  | Symbol x when (List.contains x unops) ->
+      // apply unary operator to one argument
+      match pars with
+      | Cons (v, Nil) -> applyUnop x v
+      | _ -> raise (Lerror ("Wrong number of arguments to " + x))
+  | Symbol x when (List.contains x binops) ->
+      // apply binary operator to two arguments
+      match pars with
+      | Cons (v1, Cons (v2, Nil)) ->
+            applyBinop x (v1, v2, localEnv)
+      | _ -> raise (Lerror ("Wrong number of arguments to " + x))
+  | Symbol x when (List.contains x varops) ->
+      // apply variable-arity operator to all arguments
+      applyVarop x pars
+  | Closure (Cons (Symbol "\\", rules), closureEnv) ->
+    // apply a closure to all arguments,
+    // using the environment from closure
+      try
+        tryRules rules pars closureEnv
+      with Lerror message ->
+        raise (Lerror (message + "\n! when applying "
+                        + showSexpIndent (Cons (Symbol "\\", rules))
+                                        16 16
+                        + "\n! to " + showSexpIndent pars 5 5))
+  | Cons (Symbol "lambda", rules) ->
+    // apply a dynamically scoped function to all arguments,
+    // using the current environment
+      try
+        tryRules rules pars localEnv
+      with Lerror message ->
+        raise (Lerror (message + "\n! when applying "
+                        + showSexpIndent fnc 16 16 + "\n! to "
+                        + showSexpIndent pars 5 5))
+    // not a function or operator -- report error
+  | _ -> raise (Lerror (showSexp fnc + " can not be applied as a function"))
 
 // evaluate argument list
 
 and evalList es localEnv =
-  try
-    match es with
-    | Nil -> Nil
-    | Cons (e1, es1) -> Cons (eval e1 localEnv, evalList es1 localEnv)
-    | _ -> raise (Lerror ("arguments are not a list: "
-                          + showSexpIndent es 25 25))
-  with
-    | :? System.ArgumentException -> eprintfn "Invalid argument during evalList"; Num 1
-    | ex -> eprintfn "Error occured during evalList: %s" ex.Message; Num 2
+  match es with
+  | Nil -> Nil
+  | Cons (e1, es1) -> Cons (eval e1 localEnv, evalList es1 localEnv)
+  | _ -> raise (Lerror ("arguments are not a list: "
+                        + showSexpIndent es 25 25))
 
 // apply unary operator (predicate)
 and applyUnop x v =
-  try
-    match (x, v) with
-    | ("number?", Num _) -> v
-    | ("symbol?", Symbol _) -> v
-    | _ -> Nil  // test failed
-  with
-    | :? System.ArgumentException -> eprintfn "Invalid argument during applyUnop"; Num 1
-    | ex -> eprintfn "Error occured during applyUnop: %s" ex.Message; Num 2
+  match (x, v) with
+  | ("number?", Num _) -> v
+  | ("symbol?", Symbol _) -> v
+  | _ -> Nil  // test failed
 // apply binary operator
 and applyBinop x (v, w, localEnv) =
-  try
-    match (x, v, w) with
-    | ("::", _, _) -> Cons (v, w)
-    | ("apply", _, _) -> applyFun (v, w, localEnv)
-    | ("/", Num m, Num n) -> if n <> 0 then Num (m / n) else Nil
-    | ("%", Num m, Num n) -> if n <> 0 then Num (m % n) else Nil
-    | ("!=", Num m, Num n) -> if m <> n then Num m else Nil
-    | _ -> Nil
-  with
-    | :? System.ArgumentException -> eprintfn "Invalid argument during applyBinop"; Num 1
-    | ex -> eprintfn "Error occured during applyBinop: %s" ex.Message; Num 2
-
+  match (x, v, w) with
+  | ("::", _, _) -> Cons (v, w)
+  | ("apply", _, _) -> applyFun (v, w, localEnv)
+  | ("/", Num m, Num n) -> if n <> 0 then Num (m / n) else Nil
+  | ("%", Num m, Num n) -> if n <> 0 then Num (m % n) else Nil
+  | ("!=", Num m, Num n) -> if m <> n then Num m else Nil
+  | _ -> Nil
 // apply variadic operator
 and applyVarop x vs =
-  try  
-    match (x, vs) with
-    | ("+", Nil) -> Num 0
-    | ("+", Cons (Num n, vs1)) -> match applyVarop x vs1 with
-                                  | Num m -> Num (n + m)
+  match (x, vs) with
+  | ("+", Nil) -> Num 0
+  | ("+", Cons (Num n, vs1)) -> match applyVarop x vs1 with
+                                | Num m -> Num (n + m)
+                                | _ -> Nil
+  | ("-", Nil) -> Num 0
+  | ("-", Cons (Num n, Nil)) -> Num (-n)
+  | ("-", Cons (Num n, vs1)) -> match applyVarop "+" vs1 with
+                                | Num m -> Num (n - m)
+                                | _ -> Nil
+  | ("*", Nil) -> Num 1
+  | ("*", Cons (Num n, vs1)) -> match applyVarop x vs1 with
+                                | Num m -> Num (n * m)
+                                | _ -> Nil
+  // comparisons return first element if arguments sorted, otherwise Nil
+  | (("<" | "=" | "<=" | ">" | ">="), Cons (Num n, Nil)) -> Num n
+  | ("<", Cons (Num n, vs1)) -> match applyVarop x vs1 with
+                                  | Num m when n < m -> Num n
                                   | _ -> Nil
-    | ("-", Nil) -> Num 0
-    | ("-", Cons (Num n, Nil)) -> Num (-n)
-    | ("-", Cons (Num n, vs1)) -> match applyVarop "+" vs1 with
-                                  | Num m -> Num (n - m)
+  | ("=", Cons (Num n, vs1)) -> match applyVarop x vs1 with
+                                  | Num m when n = m -> Num n
                                   | _ -> Nil
-    | ("*", Nil) -> Num 1
-    | ("*", Cons (Num n, vs1)) -> match applyVarop x vs1 with
-                                  | Num m -> Num (n * m)
+  | ("<=", Cons (Num n, vs1)) -> match applyVarop x vs1 with
+                                  | Num m when n <= m -> Num n
                                   | _ -> Nil
-    // comparisons return first element if arguments sorted, otherwise Nil
-    | (("<" | "=" | "<=" | ">" | ">="), Cons (Num n, Nil)) -> Num n
-    | ("<", Cons (Num n, vs1)) -> match applyVarop x vs1 with
-                                    | Num m when n < m -> Num n
-                                    | _ -> Nil
-    | ("=", Cons (Num n, vs1)) -> match applyVarop x vs1 with
-                                    | Num m when n = m -> Num n
-                                    | _ -> Nil
-    | ("<=", Cons (Num n, vs1)) -> match applyVarop x vs1 with
-                                    | Num m when n <= m -> Num n
-                                    | _ -> Nil
-    | (">=", Cons (Num n, vs1)) -> match applyVarop x vs1 with
-                                    | Num m when n >= m -> Num n
-                                    | _ -> Nil
-    | (">", Cons (Num n, vs1)) -> match applyVarop x vs1 with
-                                    | Num m when n > m -> Num n
-                                    | _ -> Nil
-    | _ -> Nil
-  with
-    | :? System.ArgumentException -> eprintfn "Invalid argument during applyVarop"; Num 1
-    | ex -> eprintfn "Error occured during applyVarop: %s" ex.Message; Num 2
+  | (">=", Cons (Num n, vs1)) -> match applyVarop x vs1 with
+                                  | Num m when n >= m -> Num n
+                                  | _ -> Nil
+  | (">", Cons (Num n, vs1)) -> match applyVarop x vs1 with
+                                  | Num m when n > m -> Num n
+                                  | _ -> Nil
+  | _ -> Nil
+
 
 // tries rules of a / or lambda, choosing first matching rule (if any)
 
 and tryRules rs args localEnv =
-  try
-    match rs with
-    | Cons (p, Cons (e, rs1)) ->
-        match matchPattern p args with
-        | Some env -> eval e (env @ localEnv)
-        | None -> tryRules rs1 args localEnv
-    | Nil -> raise (Lerror ("No patterns matched arguments "
-                            + showSexpIndent args 29 29))
-    | _ ->  raise (Lerror ("Malformed rules " + showSexpIndent rs 16 16))
-  with
-    | :? System.ArgumentException -> eprintfn "Invalid argument during tryRules"; Num 1
-    | ex -> eprintfn "Error occured during tryRules: %s" ex.Message; Num 2
+  match rs with
+  | Cons (p, Cons (e, rs1)) ->
+      match matchPattern p args with
+      | Some env -> eval e (env @ localEnv)
+      | None -> tryRules rs1 args localEnv
+  | Nil -> raise (Lerror ("No patterns matched arguments "
+                          + showSexpIndent args 29 29))
+  | _ ->  raise (Lerror ("Malformed rules " + showSexpIndent rs 16 16))
+
 
 // match pattern to argument list
 // returns Some environment if matches, None if not
 
 and matchPattern p v =
-  try
     match (p, v) with
     | (Nil, Nil) -> Some []
     | (Num m, Num n) when m = n -> Some []
@@ -314,9 +294,7 @@ and matchPattern p v =
         | (Some env1, Some env2) -> combine env1 env2 
         | _ -> None
     | _ -> None
-  with
-    | :? System.ArgumentException -> eprintfn "Invalid argument during matchPattern"; None
-    | ex -> eprintfn "Error occured during matchPattern: %s" ex.Message; None
+
 
 // combine environments and check if repeated variables have same value
 
@@ -335,7 +313,6 @@ and combine env1 env2 =
 // creates constant expression from value
 // used when saving global environment
 and quoteExp v =
-  try
     match v with
     | Nil -> v
     | Num n -> v
@@ -351,9 +328,6 @@ and quoteExp v =
                     quoteExp w]
           :: List.map (quoteExp << snd) env)         
     | _ -> makeList [Symbol "quote"; v]
-  with
-    | :? System.ArgumentException -> eprintfn "Invalid argument during matchPattern"; Num 1
-    | ex -> eprintfn "Error occured during matchPattern: %s" ex.Message; Num 2
 
 // read-eval-print loop (REPL) for LISP variant
 // See functionality at top of this file
