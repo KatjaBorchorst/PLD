@@ -153,12 +153,11 @@ let rec eval s localEnv =
                                 + showSexpIndent v 30 30))
       | Some env -> eval (Cons (Symbol "let", rest)) (env @ localEnv))
   | Cons (Symbol "raise", exp) ->
-      let v = eval exp localEnv 
-      raise (LISPError v)  
+      raise (LISPError exp)  
   | Cons (Symbol "try", Cons (es, Cons (Symbol "with", exp))) ->
       try
         eval es localEnv
-      with LISPError v -> printfn "LISPERROR"; applyFun (eval exp localEnv, v, localEnv)
+      with LISPError arg -> printf "LISPERROR %A" arg; applyFun (eval exp localEnv, eval arg localEnv, localEnv)
   | Cons (e1, args) -> // function application
       applyFun (eval e1 localEnv, evalList args localEnv, localEnv)
 // apply function to arguments
