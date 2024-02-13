@@ -160,7 +160,7 @@ let rec eval s localEnv =
         eval es localEnv
       with LISPError arg -> 
         // printf "LISPERROR %A" arg; 
-        applyFun (eval exp localEnv, arg, localEnv)
+        applyFun (eval exp localEnv, eval arg localEnv, localEnv)
   | Cons (e1, args) -> // function application
       applyFun (eval e1 localEnv, evalList args localEnv, localEnv)
 // apply function to arguments
