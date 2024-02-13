@@ -335,7 +335,6 @@ and quoteExp v =
 // See functionality at top of this file
 
 and repl infile () =
-  try
     printf "> " ;
     match readFromStream infile " " with
     | Success (e, p) ->
@@ -348,9 +347,6 @@ and repl infile () =
     | ErrorAt i ->
         printf "! %s \n" ("parse error at position " + string i);
         repl infile ()
-  with
-    | :? System.ArgumentException -> eprintfn "Invalid argument during repl"; ()
-    | ex -> eprintfn "Error occured during repl: %s" ex.Message; ()
 
 // Start REPL
 
