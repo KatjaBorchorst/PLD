@@ -152,15 +152,15 @@ let rec eval s localEnv =
                                 + " did not match the value "
                                 + showSexpIndent v 30 30))
       | Some env -> eval (Cons (Symbol "let", rest)) (env @ localEnv))
-  | Cons (Symbol "raise", exp) ->
-      // printf "%A" exp
-      raise (LISPError exp)
-  | Cons (Symbol "try", Cons (es, Cons (Symbol "with", Cons(exp, Nil)))) ->
+  | Cons (Symbol "raise", Cons(exp, Nil)) ->
+      let raisedArg = eval exp localEnv in
+        raise (LISPError raisedArg)
+  | Cons (Symbol "try", Cons (expr, Cons (Symbol "with", Cons (handler, Nil)))) ->
       try
-        eval es localEnv
-      with LISPError arg -> 
-        // printf "LISPERROR %A" arg; 
-        applyFun (eval exp localEnv, arg, localEnv)
+          eval expr localEnv
+      with
+      | LISPError arg ->
+          applyFun (eval handler localEnv, Cons (arg, Nil), localEnv)
   | Cons (e1, args) -> // function application
       applyFun (eval e1 localEnv, evalList args localEnv, localEnv)
 // apply function to arguments
