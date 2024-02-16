@@ -153,8 +153,7 @@ let rec eval s localEnv =
                                 + showSexpIndent v 30 30))
       | Some env -> eval (Cons (Symbol "let", rest)) (env @ localEnv))
   | Cons (Symbol "raise", Cons(exp, Nil)) ->
-      let raisedArg = eval exp localEnv in
-        raise (LISPError raisedArg)
+      raise (LISPError (eval exp localEnv))
   | Cons (Symbol "try", Cons (expr, Cons (Symbol "with", Cons (handler, Nil)))) ->
       try
           eval expr localEnv
@@ -301,17 +300,12 @@ and matchPattern p v =
 // combine environments and check if repeated variables have same value
 
 and combine env1 env2 =
-  try
     match env1 with
     | [] -> Some env2
     | (x,v) :: env3 ->
         match lookup env2 x with
         | Some w -> if v = w then combine env3 env2 else None
         | None -> combine env3 ((x,v) :: env2)
-  with
-    | :? System.ArgumentException -> eprintfn "Invalid argument during combine"; None
-    | ex -> eprintfn "Error occured during combine: %s" ex.Message; None
-
 // creates constant expression from value
 // used when saving global environment
 and quoteExp v =
