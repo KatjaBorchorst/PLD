@@ -147,7 +147,7 @@ let rec eval s localEnv =
   | Cons (Symbol "let", Cons (p, Cons (e1, rest))) -> 
       let v = eval e1 localEnv 
       (match matchPattern p v with
-      | None -> raise (Lerror ("The pattern g"
+      | None -> raise (Lerror ("The pattern"
                                 + showSexpIndent p 12 12
                                 + " did not match the value "
                                 + showSexpIndent v 30 30))
