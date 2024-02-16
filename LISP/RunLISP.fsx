@@ -301,16 +301,13 @@ and matchPattern p v =
 // combine environments and check if repeated variables have same value
 
 and combine env1 env2 =
-  try
-    match env1 with
-    | [] -> Some env2
-    | (x,v) :: env3 ->
-        match lookup env2 x with
-        | Some w -> if v = w then combine env3 env2 else None
-        | None -> combine env3 ((x,v) :: env2)
-  with
-    | :? System.ArgumentException -> eprintfn "Invalid argument during combine"; None
-    | ex -> eprintfn "Error occured during combine: %s" ex.Message; None
+  match env1 with
+  | [] -> Some env2
+  | (x,v) :: env3 ->
+      match lookup env2 x with
+      | Some w -> if v = w then combine env3 env2 else None
+      | None -> combine env3 ((x,v) :: env2)
+
 
 // creates constant expression from value
 // used when saving global environment
