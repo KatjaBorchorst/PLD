@@ -12,15 +12,14 @@ import Main (bizarre, ninka)
 -- mina = mango plys (bizarre ninka) (dingo zap)
 
 m' (g) z = (g) z
-bizarre' () g x = m' x
+
+bizarre' () g x = m' (g) x
 
 mango f u v = f v u
 
 plip' (w) k m = (w) k m 
 
 plop' (w) n = plip' (w) n 484000
-
--- dingo' () w = plop' () 17
 
 dingo' () w = plop' (w) 17
 
