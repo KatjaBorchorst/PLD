@@ -36,21 +36,28 @@ uint64_t *stackTop = stackBottom+99;
 int stack_size = 1000; /* work stack for GC to use */
 
 void mark() {
+  
   uint64_t *stack[stack_size];
   uint64_t stackPointer = 0;
   uint64_t *tmp;
   uint64_t *heapPointer;
   uint64_t size;
+  uint64_t *j;
 
   /* add root set to work stack */
-
+  
   for (uint64_t *i = firstGlobal; i <= lastGlobal; i++) {
-    heapPointer = isHeapPointer((uint64_t*) *i);
-    if (heapPointer) {
-      stack[stackPointer++] = heapPointer;
-      size = *(heapPointer-1);
-      i += size;
-    }
+ 
+    printf("i:%ld\n", i);
+    j = i++;
+    printf("i-j: %ld\n", (i-j));
+    // heapPointer = isHeapPointer((uint64_t*) *i);
+    // if (heapPointer) {
+    //   stack[stackPointer++] = heapPointer;
+    //   size = *(heapPointer-1);
+    //   i += size;
+    //   printf("i += size: %d", *i);
+    // }
   }
       
   for (uint64_t *i = stackBottom; i <= stackTop; i++)
@@ -118,7 +125,6 @@ uint64_t *allocate(uint64_t size) {
     uint64_t *current = freelist;
     uint64_t currentSize = 0;
     printf("alloc: %d, size = %ld\n",i, size);
-    
     while (current != NULL) {
       currentSize = *(current-1);
       if (currentSize > size+2) { /* split object */
@@ -126,11 +132,13 @@ uint64_t *allocate(uint64_t size) {
 	*(current+currentSize-size-1) = size;
 	*(current-1) -= size;
 	return current+(currentSize-size);
-      } else if (currentSize >= size) { /* return object */
+      } else if (currentSize >= size) 
+      { /* return object */
 	if (previous == NULL) freelist = (uint64_t*) *current;
 	else *previous = *current;
 	return current;
       } else { /* find next object in freelist */
+    
 	previous = current;
 	current = (uint64_t*) *current;
       }
@@ -145,6 +153,7 @@ int main() {
   uint64_t *cc = NULL;
 
   initialize_freelist();
+  
 
   /* allocate pseudo-randomly until allocation fails */
   for (int i = 0; i<60; i++) {
