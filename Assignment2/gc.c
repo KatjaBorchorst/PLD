@@ -18,11 +18,13 @@ void initialize_freelist() {
   freelist +=2;
 }
 
-int isHeapPointer(uint64_t *value) {
+uint64_t *isHeapPointer(uint64_t *value) {
   if (value < heapStart) return 0;
-  if (value > heapEnd) return 0;
-  if (*(value-2) != 0xfff09c169414613) return 0;
-  return 1;
+  if (value - 1 > heapEnd) return 0; //pointer points more than one element after heapEnd
+  if (*value = 0xfff09c169414613) return value + 2; //pointer points to magic word
+  while (*(value - 1) != 0xfff09c169414613) // Terminates when at element right before magic word
+    value = value - 1;
+  return value + 1;
 }
 
 uint64_t firstGlobal[100] = {0}; /* simulated global variables */
@@ -37,12 +39,20 @@ void mark() {
   uint64_t *stack[stack_size];
   uint64_t stackPointer = 0;
   uint64_t *tmp;
+  uint64_t *heapPointer;
   uint64_t size;
 
   /* add root set to work stack */
-  for (uint64_t *i = firstGlobal; i <= lastGlobal; i++)
-    if (isHeapPointer((uint64_t*) *i))
-      stack[stackPointer++] = (uint64_t*) *i;
+
+  for (uint64_t *i = firstGlobal; i <= lastGlobal; i++) {
+    heapPointer = isHeapPointer((uint64_t*) *i);
+    if (heapPointer) {
+      stack[stackPointer++] = heapPointer;
+      size = *(heapPointer-1);
+      i += size;
+    }
+  }
+      
   for (uint64_t *i = stackBottom; i <= stackTop; i++)
     if (isHeapPointer((uint64_t*) *i))
       stack[stackPointer++] = (uint64_t*) *i;
