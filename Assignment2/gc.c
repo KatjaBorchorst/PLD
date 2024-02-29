@@ -48,16 +48,13 @@ void mark() {
   
   for (uint64_t *i = firstGlobal; i <= lastGlobal; i++) {
  
-    printf("i:%ld\n", i);
-    j = i++;
-    printf("i-j: %ld\n", (i-j));
-    // heapPointer = isHeapPointer((uint64_t*) *i);
-    // if (heapPointer) {
-    //   stack[stackPointer++] = heapPointer;
-    //   size = *(heapPointer-1);
-    //   i += size;
-    //   printf("i += size: %d", *i);
-    // }
+    heapPointer = isHeapPointer((uint64_t*) *i);
+    if (heapPointer) {
+      stack[stackPointer++] = heapPointer;
+      size = *(heapPointer-1);
+      i += size;
+      printf("i += size: %d", *i);
+    }
   }
       
   for (uint64_t *i = stackBottom; i <= stackTop; i++)
@@ -147,25 +144,43 @@ uint64_t *allocate(uint64_t size) {
     gc(); /* call garbage collector */
   }
 }
-
 int main() {
   uint64_t *ll = NULL;
   uint64_t *cc = NULL;
 
   initialize_freelist();
-  
 
-  /* allocate pseudo-randomly until allocation fails */
   for (int i = 0; i<60; i++) {
-    if ((cc = allocate((3*i)%11+2)) != 0) {
+    if ((cc = allocate((3*i)%11+3)) != 0) {
       printf("allocation successful: %ld\n", cc - heapStart);
       cc[0] = 0x1001*i;
-      if (i%13 == 0) cc[1] =  firstGlobal[i%11]; else cc[1] = 0;
+      if (i%13 == 0) cc[1] =  firstGlobal[i%17]; else cc[1] = 0;
       ll = cc;
-      firstGlobal[i%17] = (uint64_t) ll;
+      firstGlobal[i%17] = (uint64_t) (ll+i%3);
     } else {
       printf("Allocation failed at i == %d, size = %d\n", i, (3*i)%11+2);
       exit(0);
     }
   }
 }
+// int main() {
+//   uint64_t *ll = NULL;
+//   uint64_t *cc = NULL;
+
+//   initialize_freelist();
+  
+
+//   /* allocate pseudo-randomly until allocation fails */
+//   for (int i = 0; i<60; i++) {
+//     if ((cc = allocate((3*i)%11+2)) != 0) {
+//       printf("allocation successful: %ld\n", cc - heapStart);
+//       cc[0] = 0x1001*i;
+//       if (i%13 == 0) cc[1] =  firstGlobal[i%11]; else cc[1] = 0;
+//       ll = cc;
+//       firstGlobal[i%17] = (uint64_t) ll;
+//     } else {
+//       printf("Allocation failed at i == %d, size = %d\n", i, (3*i)%11+2);
+//       exit(0);
+//     }
+  // }
+// }
