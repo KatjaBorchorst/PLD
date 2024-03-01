@@ -18,11 +18,13 @@ void initialize_freelist() {
   freelist +=2;
 }
 
-int isHeapPointer(uint64_t *value) {
+uint64_t *isHeapPointer(uint64_t *value) {
   if (value < heapStart) return 0;
-  if (value > heapEnd) return 0;
-  if (*(value-2) != 0xfff09c169414613) return 0;
-  return 1;
+  if (value - 1 > heapEnd) return 0; //pointer points more than one element after heapEnd
+  if (*value = 0xfff09c169414613) return value + 2; //pointer points to magic word
+  while (*(value - 1) != 0xfff09c169414613) // Terminates when at element right before magic word
+    value = value - 1;
+  return value + 1;
 }
 
 uint64_t firstGlobal[100] = {0}; /* simulated global variables */
@@ -34,15 +36,27 @@ uint64_t *stackTop = stackBottom+99;
 int stack_size = 1000; /* work stack for GC to use */
 
 void mark() {
+  
   uint64_t *stack[stack_size];
   uint64_t stackPointer = 0;
   uint64_t *tmp;
+  uint64_t *heapPointer;
   uint64_t size;
+  uint64_t *j;
 
   /* add root set to work stack */
-  for (uint64_t *i = firstGlobal; i <= lastGlobal; i++)
-    if (isHeapPointer((uint64_t*) *i))
-      stack[stackPointer++] = (uint64_t*) *i;
+  
+  for (uint64_t *i = firstGlobal; i <= lastGlobal; i++) {
+ 
+    heapPointer = isHeapPointer((uint64_t*) *i);
+    if (heapPointer) {
+      stack[stackPointer++] = heapPointer;
+      size = *(heapPointer-1);
+      i += size;
+      printf("i += size: %d", *i);
+    }
+  }
+      
   for (uint64_t *i = stackBottom; i <= stackTop; i++)
     if (isHeapPointer((uint64_t*) *i))
       stack[stackPointer++] = (uint64_t*) *i;
@@ -108,7 +122,6 @@ uint64_t *allocate(uint64_t size) {
     uint64_t *current = freelist;
     uint64_t currentSize = 0;
     printf("alloc: %d, size = %ld\n",i, size);
-    
     while (current != NULL) {
       currentSize = *(current-1);
       if (currentSize > size+2) { /* split object */
@@ -116,11 +129,13 @@ uint64_t *allocate(uint64_t size) {
 	*(current+currentSize-size-1) = size;
 	*(current-1) -= size;
 	return current+(currentSize-size);
-      } else if (currentSize >= size) { /* return object */
+      } else if (currentSize >= size) 
+      { /* return object */
 	if (previous == NULL) freelist = (uint64_t*) *current;
 	else *previous = *current;
 	return current;
       } else { /* find next object in freelist */
+    
 	previous = current;
 	current = (uint64_t*) *current;
       }
@@ -129,24 +144,43 @@ uint64_t *allocate(uint64_t size) {
     gc(); /* call garbage collector */
   }
 }
-
 int main() {
   uint64_t *ll = NULL;
   uint64_t *cc = NULL;
 
   initialize_freelist();
 
-  /* allocate pseudo-randomly until allocation fails */
   for (int i = 0; i<60; i++) {
-    if ((cc = allocate((3*i)%11+2)) != 0) {
+    if ((cc = allocate((3*i)%11+3)) != 0) {
       printf("allocation successful: %ld\n", cc - heapStart);
       cc[0] = 0x1001*i;
-      if (i%13 == 0) cc[1] =  firstGlobal[i%11]; else cc[1] = 0;
+      if (i%13 == 0) cc[1] =  firstGlobal[i%17]; else cc[1] = 0;
       ll = cc;
-      firstGlobal[i%17] = (uint64_t) ll;
+      firstGlobal[i%17] = (uint64_t) (ll+i%3);
     } else {
       printf("Allocation failed at i == %d, size = %d\n", i, (3*i)%11+2);
       exit(0);
     }
   }
 }
+// int main() {
+//   uint64_t *ll = NULL;
+//   uint64_t *cc = NULL;
+
+//   initialize_freelist();
+  
+
+//   /* allocate pseudo-randomly until allocation fails */
+//   for (int i = 0; i<60; i++) {
+//     if ((cc = allocate((3*i)%11+2)) != 0) {
+//       printf("allocation successful: %ld\n", cc - heapStart);
+//       cc[0] = 0x1001*i;
+//       if (i%13 == 0) cc[1] =  firstGlobal[i%11]; else cc[1] = 0;
+//       ll = cc;
+//       firstGlobal[i%17] = (uint64_t) ll;
+//     } else {
+//       printf("Allocation failed at i == %d, size = %d\n", i, (3*i)%11+2);
+//       exit(0);
+//     }
+  // }
+// }
