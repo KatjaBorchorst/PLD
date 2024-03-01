@@ -22,20 +22,20 @@ mina' = mango plys (bizarre' () ninka) (dingo' () zap)
 
 eval (M (g)) z = eval g z
 
-eval (Bizarre ()) (g, z) = eval (M (g)) x
+eval (Bizarre ()) g x = eval (M (g)) x
 
-eval (Mango ()) f u v = eval f v u -- Skal argumenterene være i parentes?
+eval (Mango ()) f u v = eval f v u
 
-eval (Plip (w)) k m = eval w k m -- Igen argumenter i parentes?. I slides har de kun 1 på højre side af de implicit. Idk man
+eval (Plip (w)) k m = eval w k m
 
 eval (Plop (w)) n = eval (Plip (w)) n 484000
 
 eval (Dingo ()) w = eval (Plop (w)) 17
 
-eval (Plys ()) x y = eval x + 4
+eval (Plys ()) x y = x + 4
 
-eval (Ninka ()) x = 0 - eval x
+eval (Ninka ()) x = 0 - x
 
-eval (Zap ()) x y = eval x * eval y
+eval (Zap ()) x y = x * y
 
 eval (Mina ()) = eval mango () (eval (Plys () (eval Bizarre () ninka) (eval Dingo () (eval Zap ()))))
