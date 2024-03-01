@@ -19,12 +19,9 @@ let addSomething () =
     x <- x + 2
     res 
 
-let addSomethingFun () =
-    let res = (fun () -> x + 2)
-    x <- x + 2
-    res 
+let addSomethingInThisScope () =
+    addSomething ()
 
+printfn "addSomething first time: %i" (addSomething ()) 
 
-printfn "addSomething first time: %i" (addSomething ())
-
-printfn "addSomething second time: %i" (addSomething ())
+printfn "addSomething second time: %i" (addSomethingInThisScope ())
