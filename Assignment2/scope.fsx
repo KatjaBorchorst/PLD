@@ -22,10 +22,7 @@ let addSomething () =
 
 let addSomethingInThisScope () =
     addSomething ()
-let addSomethingInThisScope () =
-    addSomething ()
 
-printfn "addSomething first time: %i" (addSomething ()) 
+printfn "addSomething first time: %i" (addSomething ())
 
-printfn "addSomething second time: %i" (addSomethingInThisScope ())
 printfn "addSomething second time: %i" (addSomethingInThisScope ())
