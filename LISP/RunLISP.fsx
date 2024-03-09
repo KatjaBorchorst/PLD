@@ -23,28 +23,19 @@ let mutable globalEnv = []
 // environment is represented as list of (name,value) pairs
 
 let rec lookup env x =
-  try
-    match env with
-    | [] -> None
-    | ((y,v) :: env1) -> if x=y then Some v else lookup env1 x
-  with
-    | :? System.ArgumentException -> eprintfn "Invalid argument during lookup"; None
-    | ex -> eprintfn "Error occured during lookup: %s" ex.Message; None
-  
+  match env with
+  | [] -> None
+  | ((y,v) :: env1) -> if x=y then Some v else lookup env1 x
+
 
 // update binding in environment, adding new if not bound
 // only used for global environment
 
 let rec update env x v =
-  try
-    match env with
-    | [] -> [(x,v)]
-    | ((y,w) :: env1) ->
-        if x=y then (x,v) :: env1 else (y,w) :: update env1 x v
-  with
-    //default return value might not work actually lol :) 
-    | :? System.ArgumentException -> eprintfn "Invalid argument during update"; []
-    | ex -> eprintfn "Error occured during update: %s" ex.Message; []
+  match env with
+  | [] -> [(x,v)]
+  | ((y,w) :: env1) ->
+      if x=y then (x,v) :: env1 else (y,w) :: update env1 x v
 
 // update global environment
 
@@ -329,7 +320,6 @@ and quoteExp v =
 // See functionality at top of this file
 
 and repl infile () =
-  try
     printf "> " ;
     match readFromStream infile " " with
     | Success (e, p) ->
@@ -342,9 +332,6 @@ and repl infile () =
     | ErrorAt i ->
         printf "! %s \n" ("parse error at position " + string i);
         repl infile ()
-  with
-    | :? System.ArgumentException -> eprintfn "Invalid argument during repl"; ()
-    | ex -> eprintfn "Error occured during repl: %s" ex.Message; ()
 
 // Start REPL
 
