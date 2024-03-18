@@ -49,17 +49,15 @@ void mark() {
   for (uint64_t *i = firstGlobal; i <= lastGlobal; i++) {
  
     heapPointer = isHeapPointer((uint64_t*) *i);
-    if (heapPointer) {
+    if (heapPointer && stack[stackPointer] != heapPointer) {
       stack[stackPointer++] = heapPointer;
-      size = *(heapPointer-1);
-      i += size;
-      printf("i += size: %d", *i);
     }
   }
       
   for (uint64_t *i = stackBottom; i <= stackTop; i++)
-    if (isHeapPointer((uint64_t*) *i))
+    if (isHeapPointer((uint64_t*) *i) && stack[stackPointer] != heapPointer) {
       stack[stackPointer++] = (uint64_t*) *i;
+    }
 
   printf("root set pushed, stackPointer == %"PRIx64"\n", stackPointer);
 
